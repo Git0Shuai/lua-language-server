@@ -15,6 +15,7 @@ local tointeger  = math.tointeger
 local tonumber   = tonumber
 local maxinteger = math.maxinteger
 local assert     = assert
+local require    = require
 
 _ENV = nil
 
@@ -233,7 +234,7 @@ local ListFinishMap = {
     ['while']    = true,
 }
 
-local State, Lua, Line, LineOffset, Chunk, Tokens, Index, LastTokenFinish, Mode, LocalCount, LocalLimited
+local State, Uri, Lua, Line, LineOffset, Chunk, Tokens, Index, LastTokenFinish, Mode, LocalCount, LocalLimited
 
 local LocalLimit = 200
 
@@ -2119,6 +2120,7 @@ local function resolveName(node)
     end
     local name = node[1]
     bindSpecial(node, name)
+
     return node
 end
 
@@ -2329,21 +2331,19 @@ local function parseFunction(isLocal, isAction)
     pushChunk(func)
     local params
     if func.name and func.name.type == 'getmethod' then
-        if func.name.type == 'getmethod' then
-            params = {
-                type   = 'funcargs',
-                start  = funcRight,
-                finish = funcRight,
-                parent = func
-            }
-            params[1] = createLocal {
-                start  = funcRight,
-                finish = funcRight,
-                parent = params,
-                [1]    = 'self',
-            }
-            params[1].type = 'self'
-        end
+        params = {
+            type   = 'funcargs',
+            start  = funcRight,
+            finish = funcRight,
+            parent = func
+        }
+        params[1] = createLocal {
+            start  = funcRight,
+            finish = funcRight,
+            parent = params,
+            [1]    = 'self',
+        }
+        params[1].type = 'self'
     end
     if hasLeftParen then
         params = params or {}
@@ -2782,13 +2782,21 @@ end
 
 local function bindValue(n, v, index, lastValue, isLocal, isSet)
     if isLocal then
-        if v and v.special then
-            addSpecial(v.special, n)
+        if v then
+            if v.special then
+                addSpecial(v.special, n)
+            end
+            if v.type == 'call' and v.node and v.node.special == 'require' then
+                n.tag = 'localreqiresetonec'
+            end
         end
     elseif isSet then
         n.type = GetToSetMap[n.type] or n.type
         if n.type == 'setlocal' then
             local loc = n.node
+            if loc.tag == 'localreqiresetonec' then
+                loc.tag = nil
+            end
             if loc.attrs then
                 pushError {
                     type   = 'SET_CONST',
@@ -3848,6 +3856,9 @@ function parseAction()
             exp.parent  = name
             if name.type == 'setlocal' then
                 local loc = name.node
+                if loc.tag == 'localreqiresetonec' then
+                    loc.tag = nil
+                end
                 if loc.attrs then
                     pushError {
                         type   = 'SET_CONST',
@@ -3899,7 +3910,8 @@ local function parseLua()
         finish = 0,
     }
     pushChunk(main)
-    createLocal{
+
+    createLocal {
         type   = 'local',
         start  = -1,
         finish = -1,
@@ -3909,6 +3921,28 @@ local function parseLua()
         special= '_G',
         [1]    = State.ENVMode,
     }
+
+    if State.options.fenvasglobal then
+        -- 在文件头插入全局变量
+        -- FENV__u_r_i = { }
+        local scope = require 'workspace.scope'
+        local scp   = scope.getScope(Uri)
+        State.rtnfenv = resolveName {
+            start  = -1,
+            finish = -1,
+            tag    = '__FENVASGLOBAL',
+            [1]    = 'FENV__' .. sgsub(ssub(Uri, #scp.uri + 2, #Uri - 4), '[^%a%d_]+', '_'),
+        }
+        local emptytbl = {
+            type   = 'table',
+            start  = -1,
+            finish = -1,
+        }
+
+        pushActionIntoCurrentChunk(State.rtnfenv)
+        bindValue(State.rtnfenv, emptytbl, 1, nil, false, true)
+    end
+
     LocalCount = 0
     skipFirstComment()
     while true do
@@ -3920,13 +3954,37 @@ local function parseLua()
             break
         end
     end
+
+    local finish = getPosition(#Lua, 'right')
+    if State.options.fenvasglobal then
+        -- 在文件尾插入代码
+        -- return FENV__u_r_i
+        local rtn = {
+            type   = 'return',
+            start  = finish + 1,
+            finish = finish + 1,
+            [1]    = resolveName {
+                start  = finish + 1,
+                finish = finish + 1,
+                tag    = '__FENVASGLOBAL',
+                [1]    = State.rtnfenv[1],
+            }
+        }
+
+        rtn[1].parent = rtn
+        main[#main+1] = rtn
+        rtn.parent    = main
+        main.returns  = { rtn }
+
+    end
+
     popChunk()
-    main.finish = getPosition(#Lua, 'right')
+    main.finish = finish + 1
 
     return main
 end
 
-local function initState(lua, version, options)
+local function initState(uri, lua, version, options)
     Lua                 = lua
     Line                = 0
     LineOffset          = 1
@@ -3939,7 +3997,9 @@ local function initState(lua, version, options)
     ---@class parser.state
     ---@field uri uri
     ---@field lines integer[]
+    ---@field rtnfenv parser.object?
     local state = {
+        uri     = uri,
         version = version,
         lua     = lua,
         ast     = {},
@@ -3954,6 +4014,7 @@ local function initState(lua, version, options)
     if not state.options.nonstandardSymbol then
         state.options.nonstandardSymbol = {}
     end
+
     State = state
     if version == 'Lua 5.1' or version == 'LuaJIT' then
         state.ENVMode = '@fenv'
@@ -3978,9 +4039,10 @@ local function initState(lua, version, options)
     end
 end
 
-return function (lua, mode, version, options)
+return function (uri, lua, mode, version, options)
     Mode = mode
-    initState(lua, version, options)
+    Uri  = uri
+    initState(uri, lua, version, options)
     skipSpace()
     if     mode == 'Lua' then
         State.ast = parseLua()

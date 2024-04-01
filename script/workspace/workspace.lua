@@ -66,6 +66,7 @@ function m.remove(uri)
             scp:set('ready', false)
             scp:set('nativeMatcher', nil)
             scp:set('libraryMatcher', nil)
+            scp:set('fenvasglobalMatcher', nil)
             scp:removeAllLinks()
             m.flushFiles(scp)
             return
@@ -257,6 +258,40 @@ function m.isIgnored(uri)
     local scp    = scope.getScope(uri)
     local path   = m.getRelativePath(uri)
     local ignore = m.getNativeMatcher(scp)
+    if not ignore then
+        return false
+    end
+    return ignore(path)
+end
+
+--- 创建排除 fenvasglobal 文件排查匹配器
+---@param scp scope
+function m.getFenvasglobalMatcher(scp)
+    if scp:get 'fenvasglobalMatcher' then
+        return scp:get 'fenvasglobalMatcher'
+    end
+
+    local pattern = {}
+    for _, path in ipairs(config.get(scp.uri, 'Lua.runtime.fenvasglobal.blacklist')) do
+        log.debug('Ignore fenvasglobal directory:', path)
+        pattern[#pattern+1] = path
+    end
+
+    local matcher = glob.gitignore(pattern, {
+        root       = scp.uri and furi.decode(scp.uri),
+        ignoreCase = platform.os == 'windows',
+    }, globInteferFace)
+
+    scp:set('fenvasglobalMatcher', matcher)
+    return matcher
+end
+
+--- 文件是否在 fenvasglobal 黑名单中
+---@param uri uri
+function m.isIgnoreFenvasglobal(uri)
+    local scp    = scope.getScope(uri)
+    local path   = m.getRelativePath(uri)
+    local ignore = m.getFenvasglobalMatcher(scp)
     if not ignore then
         return false
     end

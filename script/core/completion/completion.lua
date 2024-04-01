@@ -23,6 +23,7 @@ local wssymbol     = require 'core.workspace-symbol'
 local findSource   = require 'core.find-source'
 local diagnostic   = require 'provider.diagnostic'
 local autoRequire  = require 'core.completion.auto-require'
+local utils        = require 'utility'
 
 local diagnosticModes = {
     'disable-next-line',
@@ -547,20 +548,22 @@ local function checkFieldThen(state, name, src, word, startPos, position, parent
     else
         textEdit, additionalTextEdits = checkFieldFromFieldToIndex(state, name, src, parent, word, startPos, position)
     end
-    results[#results+1] = {
-        label      = name,
-        kind       = kind,
-        deprecated = vm.getDeprecated(src) and true or nil,
-        textEdit   = textEdit,
-        id         = stack(src, function (newSrc) ---@async
-            return {
-                detail      = buildDetail(newSrc),
-                description = buildDesc(newSrc),
-            }
-        end),
+    if not util.stringEndWith(name, 'FENV__') then
+        results[#results+1] = {
+            label      = name,
+            kind       = kind,
+            deprecated = vm.getDeprecated(src) and true or nil,
+            textEdit   = textEdit,
+            id         = stack(src, function (newSrc) ---@async
+                return {
+                    detail      = buildDetail(newSrc),
+                    description = buildDesc(newSrc),
+                }
+            end),
 
-        additionalTextEdits = additionalTextEdits,
-    }
+            additionalTextEdits = additionalTextEdits,
+        }
+    end
 end
 
 ---@async
@@ -674,6 +677,11 @@ end
 local function checkGlobal(state, word, startPos, position, parent, oop, results)
     local locals = guide.getVisibleLocals(state.ast, position)
     local globals = vm.getGlobalSets(state.uri, 'variable')
+    for i = #globals, 1, -1 do
+        if globals[i][1] and utils.stringStartWith(globals[i][1], 'FENV__') then
+            globals[i] = nil
+        end
+    end
     checkFieldOfRefs(globals, state, word, startPos, position, parent, oop, results, locals, 'global')
 end
 
@@ -895,10 +903,12 @@ local function checkProvideLocal(state, word, start, results)
         and not used[source[1]]
         and matchKey(word, source[1]) then
             used[source[1]] = true
-            results[#results+1] = {
-                label = source[1],
-                kind  = define.CompletionItemKind.Variable,
-            }
+            if not util.stringStartWith(source[1], 'FENV__') then
+                results[#results+1] = {
+                    label = source[1],
+                    kind  = define.CompletionItemKind.Variable,
+                }
+            end
         end
     end)
     guide.eachSourceType(block, 'getlocal', function (source)
@@ -1546,7 +1556,7 @@ local function tryWord(state, position, triggerCharacter, results)
                     local env = guide.getENV(state.ast, startPos)
                     if env then
                         checkGlobal(state, word, startPos, position, env, false, results)
-                        checkModule(state, word, startPos, results) 
+                        checkModule(state, word, startPos, results)
                     end
                 end
             end

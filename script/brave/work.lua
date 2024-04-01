@@ -96,6 +96,7 @@ end)
 ---@field options brave.param.compile.options
 
 ---@class brave.param.compile.options
+---@field fenvasglobal boolean
 ---@field special table<string, string>
 ---@field unicodeName boolean
 ---@field nonstandardSymbol table<string, true>

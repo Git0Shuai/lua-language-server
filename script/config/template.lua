@@ -195,6 +195,8 @@ local template = {
                                                 "?/init.lua",
                                             },
     ['Lua.runtime.pathStrict']              = Type.Boolean >> false,
+    ['Lua.runtime.fenvasglobal.enable']     = Type.Boolean >> false,
+    ['Lua.runtime.fenvasglobal.blacklist']  = Type.Array(Type.String),
     ['Lua.runtime.special']                 = Type.Hash(
                                                 Type.String,
                                                 Type.String >> 'require' << {

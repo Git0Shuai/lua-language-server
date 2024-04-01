@@ -1668,7 +1668,7 @@ local function trimTailComment(text)
     and comment:find '[\'"%]]%s*$' then
         local state = compile(comment:gsub('^%s+', ''), 'String')
         if state and state.ast then
-            comment = state.ast[1] --[[@as string]]
+            comment = state.ast[1] or "" --[[@as string]]
         end
     end
     return util.trim(comment)
@@ -2086,7 +2086,7 @@ local function bindDocWithSources(sources, binded)
     bindGeneric(binded)
     bindCommentsAndFields(binded)
     bindReturnIndex(binded)
-    
+
     -- doc is special node
     if lastDoc.special then
         if bindDoc(lastDoc.special, binded) then

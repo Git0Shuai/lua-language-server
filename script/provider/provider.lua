@@ -20,6 +20,7 @@ local furi       = require 'file-uri'
 local inspect    = require 'inspect'
 local guide      = require 'parser.guide'
 local fs         = require 'bee.filesystem'
+local utils      = require 'utility'
 
 require 'library'
 
@@ -1029,7 +1030,9 @@ m.register 'workspace/symbol' {
         local results = {}
 
         for _, symbol in ipairs(symbols) do
-            results[#results+1] = convert(symbol)
+            if not utils.stringStartWith(symbol.name, 'FENV__') then
+                results[#results+1] = convert(symbol)
+            end
         end
 
         return results
@@ -1397,7 +1400,7 @@ m.register 'textDocument/inlayHint' {
         local results = core(uri, start, finish)
         local hintResults = {}
         for i, res in ipairs(results) do
-            local luri = res.source and guide.getUri(res.source) 
+            local luri = res.source and guide.getUri(res.source)
             local lstate = files.getState(luri)
             hintResults[i] = {
                 label        = {

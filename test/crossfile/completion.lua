@@ -139,7 +139,7 @@ TEST {
             ---@class A
             ---@field f1 integer
             ---@field f2 boolean
-            
+
             ---@type A[]
             X = {}
 ]],
@@ -816,7 +816,7 @@ TEST {
     }
 }
 
-if require 'bee.platform'.OS == 'Windows' then
+if require 'bee.platform'.OS == 'windows' then
 TEST {
     {
         path = [[abc/init.lua]],

@@ -4,13 +4,14 @@ local matchKey = require 'core.matchkey'
 local define   = require 'proto.define'
 local await    = require 'await'
 local vm       = require 'vm'
+local utils    = require 'utility'
 
 local function buildSource(uri, source, key, results)
     if     source.type == 'local'
     or     source.type == 'setlocal'
     or     source.type == 'setglobal' then
         local name = source[1]
-        if matchKey(key, name) then
+        if not utils.stringEndWith(name, 'FENV__') and matchKey(key, name) then
             results[#results+1] = {
                 name   = name,
                 skind  = define.SymbolKind.Variable,
@@ -22,7 +23,7 @@ local function buildSource(uri, source, key, results)
     or     source.type == 'tablefield' then
         local field = source.field
         local name  = field and field[1]
-        if name and matchKey(key, name) then
+        if name and not utils.stringEndWith(name, 'FENV__') and matchKey(key, name) then
             results[#results+1] = {
                 name   = name,
                 skind  = define.SymbolKind.Field,
@@ -62,6 +63,10 @@ end
 local function searchGlobalAndClass(key, suri, results)
     for _, global in pairs(vm.getAllGlobals()) do
         local name = global:getCodeName()
+        if utils.stringEndWith(name, 'FENV__') then
+            goto CONTINUE
+        end
+
         if matchKey(key, name) then
             local sets
             if suri then
@@ -90,6 +95,7 @@ local function searchGlobalAndClass(key, suri, results)
             end
             await.delay()
         end
+        ::CONTINUE::
     end
 end
 
@@ -126,6 +132,9 @@ local function searchClassField(key, suri, results)
             return
         end
         if not matchKey(inField, keyName) then
+            return
+        end
+        if utils.stringEndWith(class, 'FENV__') then
             return
         end
         results[#results+1] = {

@@ -467,6 +467,13 @@ local esc = {
 }
 
 function m.viewString(str, quo)
+    if not str then
+        if not quo then
+            return '""'
+        else
+            return quo .. quo
+        end
+    end
     if not quo then
         if str:find('[\r\n]') then
             quo = '[['

@@ -74,6 +74,10 @@ local function isDeclareFunctionParam(source)
     return vm.isEmptyFunction(func)
 end
 
+local function jnextTransformed(source)
+    return source.tag == 'localreqiresetonec'
+end
+
 return function (uri, callback)
     local ast = files.getState(uri)
     if not ast then
@@ -90,6 +94,9 @@ return function (uri, callback)
             return
         end
         if ignore(name) then
+            return
+        end
+        if jnextTransformed(source) then
             return
         end
         if isToBeClosed(source) then

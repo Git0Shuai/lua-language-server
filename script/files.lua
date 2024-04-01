@@ -551,6 +551,8 @@ function m.compileStateThen(state, file)
     state.originLines = file.originLines
     state.originText  = file.originText
 
+    parser.jnext(state)
+
     local clock = os.clock()
     parser.luadoc(state)
     local passed = os.clock() - clock
@@ -628,10 +630,18 @@ function m.compileStateAsync(uri, callback)
 
     ---@type brave.param.compile.options
     local options = {
+        fenvasglobal      = config.get(uri, 'Lua.runtime.fenvasglobal.enable'),
         special           = config.get(uri, 'Lua.runtime.special'),
         unicodeName       = config.get(uri, 'Lua.runtime.unicodeName'),
         nonstandardSymbol = util.arrayToHash(config.get(uri, 'Lua.runtime.nonstandardSymbol')),
     }
+
+    if options.fenvasglobal then
+        local ws = require "workspace"
+        if ws.isIgnoreFenvasglobal(uri) then
+            options.fenvasglobal = false
+        end
+    end
 
     ---@type brave.param.compile
     local params = {
@@ -682,10 +692,18 @@ function m.compileState(uri)
 
     ---@type brave.param.compile.options
     local options = {
+        fenvasglobal      = config.get(uri, 'Lua.runtime.fenvasglobal.enable'),
         special           = config.get(uri, 'Lua.runtime.special'),
         unicodeName       = config.get(uri, 'Lua.runtime.unicodeName'),
         nonstandardSymbol = util.arrayToHash(config.get(uri, 'Lua.runtime.nonstandardSymbol')),
     }
+
+    if options.fenvasglobal then
+        local ws = require "workspace"
+        if ws.isIgnoreFenvasglobal(uri) then
+            options.fenvasglobal = false
+        end
+    end
 
     local ws     = require 'workspace'
     local client = require 'client'
@@ -696,7 +714,8 @@ function m.compileState(uri)
     prog:setMessage(ws.getRelativePath(uri))
     log.trace('Compile State:', uri)
     local clock = os.clock()
-    local state, err = parser.compile(file.text
+    local state, err = parser.compile(uri
+        , file.text
         , 'Lua'
         , config.get(uri, 'Lua.runtime.version')
         , options

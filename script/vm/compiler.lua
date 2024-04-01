@@ -538,7 +538,7 @@ local function getReturnOfSetMetaTable(args)
         end)
     end
     --过滤nil
-   node:remove 'nil'
+    node:remove 'nil'
     return node
 end
 
@@ -1051,11 +1051,11 @@ local function compileFunctionParam(func, source)
             end
         end
     end
-    
+
     local derviationParam = config.get(guide.getUri(func), 'Lua.type.inferParamType')
     if derviationParam and func.parent.type == 'local' and func.parent.ref then
         local refs = func.parent.ref
-        local found 
+        local found
         for _, ref in ipairs(refs) do
             if ref.parent.type ~= 'call' then
                 goto continue
@@ -1069,13 +1069,13 @@ local function compileFunctionParam(func, source)
                     local callerArg = caller.args[index]
                     if callerArg then
                         vm.setNode(source, vm.compileNode(callerArg))
-                        finded = true
+                        found = true
                     end
                 end
             end
             ::continue::
         end
-        return finded
+        return found
     end
 end
 

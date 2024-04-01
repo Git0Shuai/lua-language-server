@@ -92,10 +92,10 @@ TEST {
         content = '---@module "<?a?>"',
     },
     hover = [[
-* [a.lua](file:///a.lua) （搜索路径： `?.lua`）]],
+* [a.lua](file:///a.lua) （搜索路径： `?.lua`)]],
 }
 
-if require 'bee.platform'.OS == 'Windows' then
+if require 'bee.platform'.os == 'windows' then
 TEST {
     {
         path = 'Folder/a.lua',
@@ -274,7 +274,7 @@ TEST {
 
             function mt:add(a, b)
             end
-            
+
             return function ()
                 return setmetatable({}, mt)
             end
@@ -1663,7 +1663,7 @@ TEST {
         content = [[
             ---@alias someType
             ---| "#" # description
-            
+
             ---@type someType
             local <?someValue?>
         ]]
